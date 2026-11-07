@@ -65,18 +65,27 @@ resource "aws_route_table" "pub_rt"{
 }
 
 resource "aws_route_table_association" "pub_rt_assoc"{
-    subnet_id = aws_subnet.pub_subnet.vpc_id
+    subnet_id = aws_subnet.pub_subnet.id
     route_table_id = aws_route_table.pub_rt.id
 }
 
-resource "aws_nat_gateway" "nat_gateway"{
-    vpc_id = aws_vpc.custom_vpc.id
-    availability_mode = "regional"  
-    connectivity_type = "public"
-    subnet_id = aws_subnet.pub_subnet.id
+resource "aws_eip" "nat_eip" {
+    domain = "vpc"
+    tags = {
+        Name = "nat-eip"
+    }
+}
+
+resource "aws_nat_gateway" "nat_gateway" {
+    allocation_id = aws_eip.nat_eip.id
+    subnet_id     = aws_subnet.pub_subnet.id
+
     tags = {
         Name = "nat-gateway"
     }
+    depends_on = [
+        aws_internet_gateway.dev_igw
+    ]
 }
 
 resource "aws_route_table" "pvt_rt"{
@@ -107,6 +116,7 @@ resource "aws_instance" "pub_instance" {
     ami           = "ami-0c230065b91270bc6"
     instance_type = "t2.micro"
     subnet_id     = aws_subnet.pub_subnet.id
+    associate_public_ip_address = true
     tags = {
         Name = "pub-instance"
     }
@@ -154,7 +164,6 @@ resource "aws_db_instance" "pvt_db_instance" {
   identifier           = "db-instance"
   username             = "admin"
   password             = "Kish123456"
-  parameter_group_name = "8.0"
   backup_retention_period = 7
   skip_final_snapshot = false
   publicly_accessible = false
